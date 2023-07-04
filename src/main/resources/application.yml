@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: clickhouse-service
+server:
+  port: 8130
