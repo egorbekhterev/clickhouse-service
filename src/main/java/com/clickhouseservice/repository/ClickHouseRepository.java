@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSetMetaData;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Repository
 @AllArgsConstructor
@@ -14,11 +15,24 @@ import java.util.*;
 public class ClickHouseRepository {
 
     private JdbcTemplate jdbcTemplate;
-    private static final String FIND_ALL = "SELECT * FROM %s WHERE %s";
+    private static final String FIND_ALL = "SELECT * FROM %s WHERE ";
 
-    public List<Map<String, Object>> findAll(String tableName, String filter) {
+    private String buildFilteredQuery(String tableName, Map<String, String> filters) {
+        StringBuilder sqlQuery = new StringBuilder(String.format(FIND_ALL, tableName));
+        AtomicInteger index = new AtomicInteger(0);
+        filters.forEach((key, value) -> {
+            if (index.getAndIncrement() > 0) {
+                sqlQuery.append("OR ");
+            }
+            sqlQuery.append(key).append(" = ? ");
+        });
+        return sqlQuery.toString();
+    }
+
+    public List<Map<String, Object>> findAll(String tableName, Map<String, String> filters) {
+        var filteredQuery = buildFilteredQuery(tableName, filters);
         List<Map<String, Object>> results = new ArrayList<>();
-        jdbcTemplate.query(String.format(FIND_ALL, tableName, filter), rs -> {
+        jdbcTemplate.query(filteredQuery, filters.values().toArray(), rs -> {
             ResultSetMetaData rsmd = rs.getMetaData();
             int columnCount = rsmd.getColumnCount();
             while (rs.next()) {
